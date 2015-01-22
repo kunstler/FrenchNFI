@@ -1,0 +1,289 @@
+% Script describing the estimation of growth for simplified tree and compute the number of recruit
+% Georges Kunstler
+
+```{r options-chunk}
+opts_chunk$set(dev= c('pdf','svg'), fig.width= 10, fig.height = 5)
+```
+
+Read the data formatted data.
+```{r Read tree data,  message=FALSE}
+output.dir <- 'output'
+load(file.path(output.dir, 'tree.dead.alive.Rdata'))
+tree.dead.alive$tree.num <- 1:length(tree.dead.alive$a)
+tree.dead.alive.alive <-  tree.dead.alive[tree.dead.alive$dead==0,]
+sum(is.na(tree.dead.alive.alive$ir5))
+table.simplif.espar <- table(tree.dead.alive.alive$espar,tree.dead.alive.alive$simplif)
+table.simplif.espar[table.simplif.espar[,2]>0,]
+
+### THIS CODE PREDICT IR5 GROWTH FOR SIMPLIFIED TREE WITH TWO METHODS
+### TO BE ABLE TO COMPUTE THE NUMBER OF RECRUITED TREE
+### BASED ON WHICH TREE GROW THROUGH THE 7.5 cm DBH in the last 5 years
+##  either assume that same growth as other individual measured of same species and same dbh classes or predict growth from function
+
+### RUN JAGS ANALYSIS OF TREE IR5 in function of c13 and random plot effect then predict for each individual
+
+
+
+################################################
+## JAGS CODE to run model for all species
+library(R2jags)
+## select species
+
+## remove any plot with 27C & 27N noyer commun or olivier d europe because not enough growth measurement
+plot.noyer <- as.numeric(names(tapply(tree.dead.alive$espar %in% c("27C","27N","28"),INDEX=tree.dead.alive$idp,FUN=sum))[tapply(tree.dead.alive$espar %in% c("27C","27N","28"),INDEX=tree.dead.alive$idp,FUN=sum)>0])
+tree.dead.alive <-  tree.dead.alive[!(tree.dead.alive$idp %in% plot.noyer),]
+
+tree.dead.alive.predict <-  tree.dead.alive[tree.dead.alive$dead==0 & is.na(tree.dead.alive$ir5) & (!is.na(tree.dead.alive$c13)) ,]
+tree.dead.alive.growth <-  tree.dead.alive[!is.na(tree.dead.alive$ir5) & (!is.na(tree.dead.alive$c13)) & (!tree.dead.alive$ir5==0) ,]
+
+## select species with at least growth in 20 different plots
+testtt <-  tapply(tree.dead.alive.growth$ir5,INDEX=data.frame(tree.dead.alive.growth$idp,tree.dead.alive.growth$espar),FUN=mean,na.rm=T)
+species.no <- colnames(testtt)[apply(!is.na(testtt),MARGIN=2,FUN=sum,na.rm=T)<100]
+
+## delete this individuals
+tree.dead.alive.predict <- tree.dead.alive.predict[!(tree.dead.alive.predict$espar %in% species.no),]
+tree.dead.alive.growth <- tree.dead.alive.growth[!(tree.dead.alive.growth$espar %in% species.no),]
+
+## le faire que popur les petits arbres !! based on maxi growth
+
+
+fun.perc.plot1 <-  function(sp.t,data){
+  species <- as.vector(unclass(factor(data$espar)))
+  species.plot <- as.vector(unclass(factor(paste(data$idp,data$espar))))
+  return(sum(table(species.plot[species==sp.t])==1)/length(table(species.plot[species==sp.t])))}
+
+prec.plot1 <- sapply(unique(as.vector(unclass(factor(tree.dead.alive.growth$espar)))),FUN=fun.perc.plot1,data=tree.dead.alive.growth)
+names(prec.plot1) <-  unique(as.vector(unclass(factor(tree.dead.alive.growth$espar))))
+sort(prec.plot1)       
+## tree.dead.alive.alive <-  tree.dead.alive.alive[1:3000,]
+rm(tree.dead.alive)
+gc()
+
+###############################################################
+###############################################################
+### Power growth  MODEL
+
+### CREATION DU SCRIPT jags
+
+GROWTH.MODEL <-
+ "################################################################################
+ ######################## growth model with JAGS #############################
+ model {
+     ############ Likelihood ###################
+     for (i in 1:N.indiv) {
+## Power growth model 
+log.ir5[i] ~ dnorm(theo.g[i],tau)
+theo.g[i] <- B1[species[i]] + B2[species[i]]*logdbh[i] +random.plot[species.plot[i]]
+}
+
+
+####  Initialisation des priors
+     ################################################
+     ########### Hierarchical parameters ########
+
+
+for (j in 1:Nsp.plots)
+  {
+     random.plot[j] ~ dnorm(0,tau.plot)
+  }
+     ###############################################
+     ########### Non-hierarchical parameters ########
+
+tau <-  pow(sigma,-2)     
+sigma ~ dunif(0.001,20)
+
+tau.plot <-  pow(sigma.t,-2)
+sigma.t ~ dunif(0.001,20)
+
+for (n in 1:NSP)
+{
+
+ B1[n] ~ dnorm(muBB0[1],0.01)
+ B2[n] ~ dnorm(muBB0[2],0.01)
+}
+
+
+
+    } # End of the jags model
+ "
+
+cat(GROWTH.MODEL , file = "GROWTH.MODEL", sep=" ", fill = FALSE, labels = NULL, append = FALSE)
+
+#######
+## data
+muBB0 <-  c(0.28,1/3)
+log.ir5 <- log(tree.dead.alive.growth$ir5)
+logdbh <- log(tree.dead.alive.growth$c13/pi)
+species <- as.vector(unclass(factor(tree.dead.alive.growth$espar)))
+
+species.plot <- as.vector(unclass(factor(paste(tree.dead.alive.growth$idp,tree.dead.alive.growth$espar))))
+## species.p <- species[!duplicated(species.plot)]
+NSP <-  length(unique(species))
+N.indiv <-  length(log.ir5)
+Nsp.plots <- length(unique(species.plot))
+
+ ############################
+ ############################# format for JAGS
+jags.data<-list("log.ir5","logdbh","N.indiv","muBB0",
+"NSP","species","Nsp.plots","species.plot") #
+
+###################################################################################
+ #### INITIAL VALUES
+    jags.inits <- function(){
+ list("sigma"=runif(1,min=0.01,max=3),"sigma.t"=runif(1,min=0.01,max=3)) #,"tau.plot"=runif(NSP,min=800,max=1200)
+       }
+   
+
+
+     ### SEND to jags
+## paralellel version
+
+   GROWTH<-jags.parallel( data=jags.data, inits=jags.inits, # We precise data and starting values
+                                      model.file = "GROWTH.MODEL", # Model file name
+                                       # To see the results in jags and to debug
+                                      parameters.to.save = c("tau","tau.plot","B1","B2","random.plot"),# "BB","W","random.plot","tau.plot"
+                                      n.chains = 3,n.cluster=3,DIC=F, # Number of chains, mieux si 3 pour calculer la convergence.
+                                      n.iter = 20000,n.burnin=5000,n.thin=150)
+
+
+
+## check convergence
+plot(GROWTH)
+
+sort((GROWTH$BUGSoutput$summary)[(GROWTH$BUGSoutput$summary[,8])>1.1,8])
+(GROWTH$BUGSoutput$summary)[(GROWTH$BUGSoutput$summary[,8])>1.11,c(1,2)]
+saveRDS(GROWTH,file="./output/GROWTH.JAGS.rds")
+GROWTH <-  readRDS("./output/GROWTH.JAGS.rds")
+
+
+#################################
+##################################
+### PREDICTION OF GROWTH FOR DATA WITH MISSING GROWTH
+
+#########################################
+### predict for new data the value
+
+# data
+pred.logdbh <- log(tree.dead.alive.predict$c13/pi)
+pred.species <- (1:NSP)[match(tree.dead.alive.predict$espar,levels(factor(tree.dead.alive.growth$espar)))]
+pred.species.plot <- (1:length(levels(factor(paste(tree.dead.alive.growth$idp,tree.dead.alive.growth$espar))) ))[match(paste(tree.dead.alive.predict$idp,tree.dead.alive.predict$espar) , levels(factor(paste(tree.dead.alive.growth$idp,tree.dead.alive.growth$espar))) )]
+# param
+
+B1 <- GROWTH$BUGSoutput$summary[1:NSP,1]
+B2 <- GROWTH$BUGSoutput$summary[(NSP+1):(NSP*2),1]
+random.plot <- GROWTH$BUGSoutput$summary[(NSP*2+1):(NSP*2+Nsp.plots),1]
+pred.log.g <- B1[pred.species] + B2[pred.species]*pred.logdbh +random.plot[pred.species.plot]
+pred.g <- exp(pred.log.g)
+
+#################################################################################
+###################################################################################
+#### compute mean IR5 of tree of same species and same size class per plot
+
+fun.mean.ir5.simplif <-  function(num.tree.t,num.tree.s,species.s,idp.s,cut.c13.s,species.g,idp.g,cut.c13.g,ir5.g)
+{
+    plot.idp <-  idp.s[num.tree.s==num.tree.t]
+    species.t <-  species.s[num.tree.s==num.tree.t]
+    cut.c13.t <- cut.c13.s[num.tree.s==num.tree.t]
+    if(sum(idp.g==plot.idp & species.g==species.t & cut.c13.g==cut.c13.t) >0){
+       return(mean( ir5.g[idp.g==plot.idp & species.g==species.t & cut.c13.g==cut.c13.t]))
+       }else{return(10000)}   
+}
+
+## growth to compute mean
+species.g <- tree.dead.alive.growth$espar
+idp.g <- tree.dead.alive.growth$idp
+cut.c13.g <- cut(tree.dead.alive.growth$c13,breaks=c(12,70.5,117.5,164.5,830),labels=F)
+ir5.g <- tree.dead.alive.growth$ir5
+## predict for simplified tree
+num.tree.s <- tree.dead.alive.predict$num.tree
+species.s <- tree.dead.alive.predict$espar
+idp.s <- tree.dead.alive.predict$idp
+cut.c13.s <- cut(tree.dead.alive.predict$c13,breaks=c(12,70.5,117.5,164.5,830),labels=F)
+
+pred.g2 <- sapply(tree.dead.alive.predict$num.tree,FUN=fun.mean.ir5.simplif,num.tree.s,species.s,idp.s,cut.c13.s,species.g,idp.g,cut.c13.g,ir5.g)
+
+library(doParallel)
+registerDoParallel(cores=4) ## affect automaticaly half of the core detected to the foreach here I decide to affect 4 cores
+getDoParWorkers() ## here 8 core so 4 core if want to use more registerDoParallel(cores=6)
+
+ pred.g2 <- foreach(num.tree.t=tree.dead.alive.predict$num.tree, .combine=c) %dopar%
+	{
+fun.mean.ir5.simplif(num.tree.t,num.tree.s,species.s,idp.s,cut.c13.s,species.g,idp.g,cut.c13.g,ir5.g)
+	}
+
+sum(is.na(pred.g))
+
+### plot of the link between two prediction
+
+pdf("./figs/comparison.ir5pred.siplif.pdf")
+plot(pred.g,pred.g2,xlab="prediction HB",ylab="prediction Mean ir5")
+lines(0:50,0:50,col="red")
+
+dev.off()
+
+par(mfrow=c(3,1))
+ data <- data.frame(tree.dead.alive.predict$c13,pred.g)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)   
+plot(tree.dead.alive.predict$c13,pred.g,xlab="c13",ylab="prediction HB ir5",cex=0.2,xlim=c(0,600),ylim=c(0,80),col=colors)
+ data <- data.frame(tree.dead.alive.predict$c13,pred.g2)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)   
+plot(tree.dead.alive.predict$c13,pred.g2,xlab="c13",ylab="prediction Mean ir5",cex=0.2,xlim=c(0,600),ylim=c(0,80),col=colors)
+ data <- data.frame(tree.dead.alive.growth$c13,tree.dead.alive.growth$ir5)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)   
+plot(tree.dead.alive.growth$c13,tree.dead.alive.growth$ir5,xlab="c13",ylab="Obs ir5",cex=0.2,xlim=c(0,600),ylim=c(0,80),col=colors)
+
+
+### add the two pred growth to the table
+names(tree.dead.alive.predict)
+tree.dead.alive$pred.ir5.hb <-  c()
+tree.dead.alive$pred.ir5.mean <-  c()
+tree.dead.alive$pred.ir5.hb[tree.dead.alive$tree.num %in% tree.dead.alive.predict$tree.num] <-  pred.g
+tree.dead.alive$pred.ir5.mean[tree.dead.alive$tree.num %in% tree.dead.alive.predict$tree.num] <-  pred.g2
+
+arbre.tot3 <-  tree.dead.alive
+
+saveRDS(arbre.tot3,file="./data/arbre.tot3.rds")
+
+######################
+######################
+##### Compute number of recruit per plot
+arbre.tot3 <- readRDS("./data/arbre.tot3.rds")
+
+head(arbre.tot3)
+
+### merge pred.ir5 and not pred.ir5 use hb ? 
+arbre.tot3$ir5.2 <-  arbre.tot3$ir5
+arbre.tot3$ir5.2[is.na(arbre.tot3$ir5)] <- arbre.tot3$pred.ir5.hb[is.na(arbre.tot3$ir5)]
+## function to decide if recruit or not
+fun.recruit <- function(data){
+c13 <- data$c13
+ir5 <-  data$ir5.2
+recruitT <-((c13 -2*pi*ir5) <23.5)
+return(sum(recruitT))
+}
+
+###by function
+res.recruit <-  by(arbre.tot3,INDICES=list(arbre.tot3$idp,arbre.tot3$espar),FUN=fun.recruit)
+data.recruit <- data.frame(idp=row.names(res.recruit),
+as.matrix(res.recruit[1:dim(res.recruit)[1],1:dim(res.recruit)[2]]))
+names(data.recruit) <- c("idp",colnames(res.recruit))
+head(data.recruit)
+
+#### compute with pred of simplified tree based on mean
+arbre.tot3$ir5.2[is.na(arbre.tot3$ir5)] <- arbre.tot3$pred.ir5.mean[is.na(arbre.tot3$ir5)]
+res.recruit2 <-  by(arbre.tot3,INDICES=list(arbre.tot3$idp,arbre.tot3$espar),FUN=fun.recruit)
+data.recruit2 <- data.frame(idp=row.names(res.recruit2),
+as.matrix(res.recruit2[1:di
+                       m(res.recruit2)[1],1:dim(res.recruit2)[2]]))
+names(data.recruit2) <- c("idp",colnames(res.recruit2))
+head(data.recruit2)
+
+##### save both data
+saveRDS(data.recruit,file="./data/data.recruit.rds")
+saveRDS(data.recruit2,file="./data/data.recruit2.rds")
+data.recruit2 <- readRDS("./data/data.recruit2.rds")
+dim(data.recruit2)
+
