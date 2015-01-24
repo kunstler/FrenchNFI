@@ -1,0 +1,203 @@
+% Formatting of the French NFI data
+% Georges Kunstler
+ 
+```{r options-chunk}
+opts_chunk$set(dev= c('pdf','svg'), fig.width= 10, fig.height = 5)
+output.dir <- 'output'
+dir.create(output.dir)
+#
+```
+
+# Description of the data
+
+The data were downloaded from the French [NFI website](http://inventaire-forestier.ign.fr/spip/spip.php?rubrique153). You need to proovides basic information (name, email and purpose of the use of the data) to download the data on the website.
+
+For each year of inventory there is 8 data files. The file need to be merged over all years. There is however some discrepancy in the variables and coding that need to be deal with. This code provides the merging for the **Tree** data, the **Plot** data, the **Ecological** data, the **Dead tree** data.
+
+The data need to be in a folder *data* with a subfolder for each year (2008, 2006, ... 2013).
+
+
+
+# READ, MERGE AND CLEAN ALL TREE DATA NEW METHODS
+Read the data for each year.
+```{r Read tree data,  message=FALSE}
+list.tree <- lapply(2008:2013, 
+      function(y) read.csv(file.path("data", y, 
+                                     paste0("arbres_foret_", y, ".csv")),
+                            sep=";"))
+```
+
+
+
+## Change Variables to be consistent across different years and merge across year
+
+*simplif* and *sfcoeur* are missing in 2008.
+
+```{r merge all year,  message=FALSE}
+list.tree[[1]]$simplif <-rep(NA, nrow(list.tree[[1]]))
+list.tree[[1]]$sfcoeur <-rep(NA, nrow(list.tree[[1]]))
+list.tree[[1]] <- list.tree[[1]][,names(list.tree[[2]])]
+
+# add year to each data
+list.tree <- lapply(1:6, 
+         function(i, list.t, years){ list.t[[i]]$year <- years[i]; return(list.t[[i]])},
+         list.tree, 2008:2013)
+data.tree <- do.call("rbind", list.tree)
+rm(list.tree)
+gc()
+```
+Save file tree
+```{r save file,  message=FALSE}
+save(data.tree,file=file.path(output.dir, "data.tree.Rdata"))
+```
+
+# READ, MERGE AND CLEAN ALL DEAD TREE DATA NEW METHODS
+Read the dead tree data for each year.
+```{r Read dead tree data,  message=FALSE}
+list.tree.dead <- lapply(2008:2013, 
+      function(y) read.csv(file.path("data", y, 
+                                     paste0("arbres_morts_foret_", y, ".csv")),
+                            sep=";"))
+list.tree.dead <- lapply(1:6, 
+         function(i, list.t, years){ list.t[[i]]$year <- years[i]; return(list.t[[i]])},
+         list.tree.dead, 2008:2013)
+```
+
+
+Merge dead tree
+```{r merge dead tree,  message=FALSE}
+data.tree.dead <- do.call("rbind", list.tree.dead)
+rm(list.tree.dead)
+gc()
+	```
+
+Save file dead tree
+```{r save dead tree file,  message=FALSE}
+save(data.tree.dead,file=file.path(output.dir,"data.tree.dead.Rdata"))
+```
+
+# MERGE DEAD AND ALIVE TREE
+```{r merge dead and alive tree files,  message=FALSE}
+	tree.dead.alive <-  data.frame(
+  idp=c(data.tree$idp,data.tree.dead$idp),
+  a=c(data.tree$a,data.tree.dead$a),
+  veget=c(data.tree$veget,data.tree.dead$veget),
+  simplif=c(data.tree$simplif,rep(NA,length=length(data.tree.dead$idp))),
+  acci=c(data.tree$acci,rep(NA,length=length(data.tree.dead$idp))),
+  espar=c(as.character(data.tree$espar),as.character(data.tree.dead$espar)),
+  ori=c(data.tree$ori,data.tree.dead$ori),
+  lib=c(data.tree$lib,rep(NA,length=length(data.tree.dead$idp))),
+  forme=c(data.tree$forme,rep(NA,length=length(data.tree.dead$idp))),
+  tige=c(data.tree$tige,rep(NA,length=length(data.tree.dead$idp))),
+  mortb=c(data.tree$mortb,rep(NA,length=length(data.tree.dead$idp))),
+  sfgui=c(data.tree$sfgui,rep(NA,length=length(data.tree.dead$idp))),
+  sfgeliv=c(data.tree$sfgeliv,rep(NA,length=length(data.tree.dead$idp))),
+  sfpied=c(data.tree$sfpied,rep(NA,length=length(data.tree.dead$idp))),
+  sfdorge=c(data.tree$sfdorge,rep(NA,length=length(data.tree.dead$idp))),
+  sfcoeur=c(data.tree$sfcoeur,rep(NA,length=length(data.tree.dead$idp))),
+  c13=c(data.tree$c13,data.tree.dead$c13),
+  ir5=c(data.tree$ir5,rep(NA,length=length(data.tree.dead$idp))),
+  htot=c(data.tree$htot,rep(NA,length=length(data.tree.dead$idp))),
+  hdec=c(data.tree$hdec,rep(NA,length=length(data.tree.dead$idp))),
+  decoupe=c(data.tree$decoupe,rep(NA,length=length(data.tree.dead$idp))),
+  q1=c(data.tree$q1,rep(NA,length=length(data.tree.dead$idp))),
+  q2=c(data.tree$q2,rep(NA,length=length(data.tree.dead$idp))),
+  q3=c(data.tree$q3,rep(NA,length=length(data.tree.dead$idp))),
+  r=c(data.tree$r,rep(NA,length=length(data.tree.dead$idp))),
+  lfsd=c(data.tree$lfsd,rep(NA,length=length(data.tree.dead$idp))),
+  age=c(data.tree$age,rep(NA,length=length(data.tree.dead$idp))),
+  v=c(data.tree$v,data.tree.dead$v),
+  w=c(data.tree$w,rep(10000/(pi*(c(15))^2),length=length(data.tree.dead$w))),
+## all dead tree are sampled on the whole plot as explained in the method
+  year=c(data.tree$year,data.tree.dead$year),
+  datemort=c(rep(NA,length=length(data.tree$year)),data.tree.dead$datemort),
+  dead=c(rep(0,length=length(data.tree$year)),
+         rep(1,length=length(data.tree.dead$idp))))## 1 = dead
+save(tree.dead.alive,file=file.path(output.dir, 'tree.dead.alive.Rdata'))
+```
+
+
+# READ, MERGE AND CLEAN ALL PLOT DATA NEW METHODS
+Read the plot data for each year.
+```{r Read plot  data,  message=FALSE}
+list.plot <- lapply(2008:2013, 
+      function(y) read.csv(file.path("data", y, 
+                                     paste0("placettes_foret_", y, ".csv")),
+                            sep=";"))
+list.plot <- lapply(1:6, 
+         function(i, list.t, years){ list.t[[i]]$year <- years[i]; return(list.t[[i]])},
+         list.plot, 2008:2013)
+```
+
+Replace with NA variable missing in 200 and Merge plot data.
+```{r Merge plot  data,  message=FALSE}
+list.plot[[1]]$gest <- NA
+list.plot[[1]]$incid <- NA
+list.plot[[1]]$peupnr <- NA
+list.plot[[1]]$portance <- NA
+list.plot[[1]]$asperite <- NA
+list.plot[[1]]$tm2 <- NA
+list.plot[[1]] <- list.plot[[1]][, names(list.plot[[2]])] 
+	
+data.plot <- do.call("rbind", list.plot)
+
+rm(list.plot)
+```
+Save file plot
+```{r save plot file,  message=FALSE}
+save(data.plot,file=file.path(output.dir, "data.plot.Rdata"))
+```
+
+
+## set coordinates and projection
+```{r plot x y,  message=FALSE, fig.cap="Plot distribution in France"}
+library(sp)
+library(raster)
+library(rgdal)
+coordinates(data.plot) =~ xl93+yl93
+proj4string(data.plot) <- CRS("+init=epsg:2154")
+## set projection to lambert93
+### plot of map of plots over FRANCE
+x   <- cbind(data.plot$xl93,data.plot$yl93)
+data <- as.data.frame(x)
+names(data) <- c("X","Y")
+colors  <- densCols(x)
+plot(x, col=colors, pch=20,cex=0.25,xlab="X",ylab="Y")
+```
+
+# READ ECOLOGICAL DATA (SOIL AND ABIOTIC VARIABLES)
+Read the ecological data for each year.
+```{r Read ecological data,  message=FALSE}
+list.ecol <- lapply(2008:2013, 
+      function(y) read.csv(file.path("data", y, 
+                                     paste0("ecologie_", y, ".csv")),
+                            sep=";"))
+# remove new variables from 2013
+list.ecol[[6]]$obsriv <- NULL
+list.ecol[[6]]$obsriv2 <- NULL
+list.ecol[[6]]$distriv <- NULL
+list.ecol[[6]]$denivriv <- NULL
+
+data.ecol <- do.call("rbind", list.ecol)
+							
+rm(list.ecol)
+```
+
+```{r save ecology file,  message=FALSE}
+save(data.ecol, file=file.path(output.dir, "data.ecol.Rdata"))
+```
+
+# READ CSV TABLE WITH LATIN NAME and CODE FOR NFI DATA
+```{r Read species name,  message=FALSE}
+species.tab <- read.csv("data/species.csv",sep="\t")
+species.tab2 <- species.tab[!is.na(species.tab$Latin_name),]
+rm(species.tab)
+gc()
+```
+
+ 
+
+
+
+
+

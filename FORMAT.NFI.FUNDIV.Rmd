@@ -1,0 +1,118 @@
+% Script to format French NFI in the format required by Sophia
+% Georges Kunstler
+
+
+```{r read formatted tree data,  message=FALSE}
+tree.tot <- readRDS(file=file.path(output.dir, "data.all.rds"))
+load(file=file.path(output.dir, "plot.tot.Rdata"))
+```
+
+Merge tree and plot
+```{r merge,  message=FALSE}
+data.tree.plot <-  merge(tree.tot,plot.tot,by="idp")
+```
+Load ecology data for date
+```{r load ecology file,  message=FALSE}
+load(file=file.path(output.dir, "ecology.tot.Rdata"))
+```
+Merge with ecology for the date and select variables
+```{r merge ecology,  message=FALSE}
+data.tree.plot <-  merge(data.tree.plot, 
+                         ecology.tot[, c('idp', 'dateeco')],
+                         by= "idp")
+
+vars <-c('idp', 'dateeco', 'dep', 'uta1', 'uta2', 'dc', 'tplant',
+         'gest', 'incid', 'plisi', 'espar', 'dead', 'datemort',
+         'veget', 'c13', 'htot', 'w', 'acci', 'ir5', 'ir5.hb', 'ir5.m')
+data.fundiv <- data.tree.plot[, vars]
+saveRDS(data.fundiv,file=file.path(output.dir, "data.fundiv.rds"))
+
+```
+
+# List of variables requested by sophia
+
+## Plot level
+- **Plot code** => idp
+- **Survey date**
+DATEECO format dd/mm/yyyy in ecological data
+
+- **Department**
+dep in plot data
+- **Plot coordinates* (Latitude/Longitude) *(*\color{red} Coordinates of the cell so +/- 500m.** xl93 yl93 "epsg:2154")
+- **Is the plot protected** (i.e. nature reserve)
+UTA1 and UTA2 provides information type of use (two main use possible so UTA1 and UTA2 give the two main use of the land).
+UTA = 4 strict protection (no access)
+UTA = 5 other kind of natural reserve
+- **Ownership** (public/private) **\color{red} Not available**
+- **Altitude** **\color{red} The exact elevation is not available in the public data, you can use the elevation based on cell coordinates. I purchased the exact elevation for the plot, but this can not be redistributed directly.**
+- **Management history**
+Several variables provide information:
+  dc is harvesting recent history
+  dc type of harvesting in the last 5 years so during *census*
+  dc = 0 no recent harvesting
+  dc = 3 clearcut with additional work
+  dc = 4 clearcut
+  dc = 6 harvesting of more than $90\%$ of dominant trees
+  dc = 6 harvesting between $50\%$ and $90\%$ of dominant trees
+  dc = 8 partial cut
+  dc = 9 some tree harvested
+
+**USE only plot with dc = 0 as no information on harvested tree.**
+
+  tplant recored information on plantation
+  tplant = 0 no plantation and other some type of plantation.
+
+  gest evidence of past management
+  gest = 0 no
+  gest = 1 few trace or old
+  gest = 2 intensive management
+
+  incid recent natural disturbance
+  incid = 0 no
+  incid = 1 less than 25 percent of cover
+  incid = 2 25 to 50 percent of cover damaged
+  incid = 3 50 to 75
+  incid = 4 more than 75
+  
+  plisi to remove plot on forest edge use only plot with plisi = 0
+  
+- **Forest type** (European forest type?) **\color{red} Not available**
+
+
+## Tree
+- **Plot** code *idp*
+- **Species** *espar*
+see species.csv for latin name
+- **Tree status** (alive, dead, cut/harvested)
+dead = 0 alive / 1 dead
+datemort date of death
+datemort = 1 less than 5 years ago so during the *census*
+datemort = 2 more than 5 years so before
+veget type of deadth
+veget = 5 standing dead
+veget = C standing dead but partly broken
+veget = A windthrow
+recruit.hb = 1 recruited tree based on hb ir5 prediction for simplified tree 
+recruit.m = 1 recruited tree based on mean ir5 prediction for simplified tree 
+
+- **DBH**
+$c13$ circumference at breast height in cm
+- **Height**
+$htot$ measured for a sample of dominant trees on each plot in m.
+- **Sample radius**
+$w$ is a weighting variable based on the size of the subplot, potential edge effect, and simplified tree (tree of the same species and same dbh class are not measured but include in this weight before 2009 - tree are simplified when there is more than 20 trees of the same species and same size class).
+- **Damage** to the tree (yes/no)
+  $acci$ only important damage are recorded.
+  acci = 0 no damage
+  acci = 1 broken
+  acci = 2 angle of more tha 30 degree partial uprooted
+  acci = 3 tree bended
+  acci = 4 burned
+  
+- **Coordinates of the tree in the plot** (angle and distance from plot centre) **\color{red} Not available**
+- **Growth measurement** – radial growth **\color{red} Missing for some tree**
+$ir5$ is the radial growth 5NOT THE DIAMETER GROWTH !!!!) measurement over the last 5 year measured with short core.
+Radial growth is not measured for all tree. Before 2009 these tree with not ir5 measurement were not recored but inlcuded as a weight in $w$. From 2009 there are recorded without missing ir5. I predicted the growth for these tree using either a HB model (**ir5.hb**) or affecting the mean growth of tree from the same species and same size class on the plot (**ir5.m**) (see SIMPLIF.RECRUIT.FORMAT.Rmd).
+
+
+

@@ -1,0 +1,320 @@
+% Script describing the estimation of growth for simplified tree and compute the number of recruit
+% Georges Kunstler
+
+```{r options-chunk}
+library(knitr)
+opts_chunk$set(dev= c('pdf','svg'), fig.width= 10, fig.height = 5)
+```
+
+# Introduction
+
+This code predict IR5 growth for the simplified tree with a regression of ir5 in function of size $c13$ with a random plot effect. Then recruited tree are identified as tree that were smaller than 7.5 cm in diamater five years ago. This is without correcting for bark growth. All trees with $C_{130}$  > 23.5 cm, > 70.5 cm and > 117.5 cm were measured within a radius of 6 m, 9 m and 15 m, respectively. However we don't know the localisation of tree in the three concentrics circular plot. Thus we can not distinguish between tree that recruited in outer circle plot or tree that were already sampled in the central plot.
+
+# R script
+
+Read the data formatted data and select alive tree.
+```{r Read tree data,  message=FALSE}
+output.dir <- 'output'
+load(file.path(output.dir, 'tree.dead.alive.Rdata'))
+tree.dead.alive$tree.num <- 1:length(tree.dead.alive$a)
+tree.alive <-  tree.dead.alive[tree.dead.alive$dead==0,]
+	```
+
+Table of simplified tree per species.
+```{r Read tree data 2,  message=FALSE}
+library(knitr)
+table.simplif.espar <- table(tree.alive$espar,tree.alive$simplif)
+kable(table.simplif.espar[table.simplif.espar[,2]>0,])
+rm(tree.alive)
+```
+
+
+
+# Jags estimation of ir5 with random plot
+```{r data for jags estimation of ir5,  message=FALSE}
+library(R2jags)
+## select species
+## remove any plot with 27C & 27N = noyer commun
+## or olivier d europe because no growth measurement
+plot.noyer <-
+as.numeric(names(tapply(tree.dead.alive$espar %in% c("27C","27N","28"),
+                        INDEX=tree.dead.alive$idp,
+			FUN=sum))[
+                 tapply(tree.dead.alive$espar %in% c("27C","27N","28"),
+  	                INDEX=tree.dead.alive$idp,
+			 FUN=sum)>0])
+tree.dead.alive <-  tree.dead.alive[!(tree.dead.alive$idp %in% plot.noyer),]
+
+tree.dead.alive.predict <-  tree.dead.alive[tree.dead.alive$dead==0 &
+                                            is.na(tree.dead.alive$ir5) &
+				   	    (!is.na(tree.dead.alive$c13)) ,]
+tree.dead.alive.growth <-  tree.dead.alive[!is.na(tree.dead.alive$ir5) &
+                                           !is.na(tree.dead.alive$c13) &
+					   !(tree.dead.alive$ir5==0) ,]
+
+## select species with at least growth
+## measurments in 100 different plots
+testtt <-  tapply(tree.dead.alive.growth$ir5,
+                  INDEX=data.frame(tree.dead.alive.growth$idp,tree.dead.alive.growth$espar),
+				  FUN=mean,na.rm=T)
+species.no <- colnames(testtt)[apply(!is.na(testtt),
+                                     MARGIN=2,
+			        FUN=sum,na.rm=T)<100]
+
+## delete this individuals
+tree.dead.alive.predict <-
+    tree.dead.alive.predict[!(tree.dead.alive.predict$espar %in% species.no),]
+tree.dead.alive.growth <-
+    tree.dead.alive.growth[!(tree.dead.alive.growth$espar %in% species.no),]
+```
+
+```{r jags estimation of ir5,  message=FALSE}
+### Fit a Power growth  MODEL
+
+### CREATION DU SCRIPT jags
+GROWTH.MODEL <-
+ "
+##########################################################################
+######################## growth model with JAGS ###########################
+ model {
+############ Likelihood ###################
+     for (i in 1:N.indiv) {
+log.ir5[i] ~ dnorm(theo.g[i],tau)
+theo.g[i] <- B1[species[i]] + B2[species[i]]*logdbh[i] +
+             random.plot[species.plot[i]]
+}
+################################################
+########### Hierarchical parameters priors #####
+for (j in 1:Nsp.plots)
+  {
+     random.plot[j] ~ dnorm(0,tau.plot)
+  }
+###############################################
+###### Non-hierarchical parameters priors #####
+tau <-  pow(sigma,-2)
+sigma ~ dunif(0.001,5)
+tau.plot <-  pow(sigma.t,-2)
+sigma.t ~ dunif(0.001,5)
+for (n in 1:NSP)
+{
+
+ B1[n] ~ dnorm(muBB0[1],0.1)
+ B2[n] ~ dnorm(muBB0[2],0.1)
+}
+    } # End of the jags model
+"
+
+cat(GROWTH.MODEL , file = "GROWTH.MODEL", sep=" ",
+    fill = FALSE, labels = NULL, append = FALSE)
+
+#######
+## data
+muBB0 <-  c(0.28,1/3) # mean of prior
+log.ir5 <- log(tree.dead.alive.growth$ir5)
+logdbh <- log(tree.dead.alive.growth$c13/pi)
+species <- as.vector(unclass(factor(tree.dead.alive.growth$espar)))
+
+species.plot <- as.vector(unclass(factor(paste(tree.dead.alive.growth$idp,
+                                  tree.dead.alive.growth$espar))))
+NSP <-  length(unique(species))
+N.indiv <-  length(log.ir5)
+Nsp.plots <- length(unique(species.plot))
+
+## format for JAGS
+jags.data<-list("log.ir5","logdbh","N.indiv","muBB0",
+                "NSP","species","Nsp.plots","species.plot")
+
+
+
+#### INITIAL VALUES
+jags.inits <- function(){
+  list("sigma"=runif(1,min=0.01,max=3),"sigma.t"=runif(1,min=0.01,max=3))
+       }
+
+## SEND to jags
+## paralellel version
+if(!file.exists(file.path(output.dir, "GROWTH.JAGS.rds"))){
+
+   GROWTH<-jags(data=jags.data,
+                         inits=jags.inits,
+                         model.file = "GROWTH.MODEL", # Model file name
+                         parameters.to.save = c("tau","tau.plot",
+						                        "B1","B2","random.plot"),
+                         n.chains = 2,
+						 DIC=FALSE,
+                         n.iter = 2500,
+						 n.burnin=500,
+						 n.thin=2)
+
+## check convergence
+# CHECK RHAT
+if(sum(GROWTH$BUGSoutput$summary[,8]>1.1)>0) stop('bad convergence of jags')
+
+##sort((GROWTH$BUGSoutput$summary)[(GROWTH$BUGSoutput$summary[,8])>1.1,8])
+##(GROWTH$BUGSoutput$summary)[(GROWTH$BUGSoutput$summary[,8])>1.11,c(1,2)]
+
+saveRDS(GROWTH,file=file.path(output.dir, "GROWTH.JAGS.rds"))
+}else{
+GROWTH <-  readRDS(file.path(output.dir, "GROWTH.JAGS.rds"))
+}
+plot(GROWTH)
+```
+Based on the jags model predict growth for trees with missing growth $ir5$.
+
+```{r jags prediction of ir5,  message=FALSE}
+# data
+pred.logdbh <- log(tree.dead.alive.predict$c13/pi)
+pred.species <- (1:NSP)[match(tree.dead.alive.predict$espar,
+                              levels(factor(tree.dead.alive.growth$espar)))]
+pred.species.plot <- (1:length(levels(factor(paste(tree.dead.alive.growth$idp,
+                     tree.dead.alive.growth$espar))) ))[
+					 match(paste(tree.dead.alive.predict$idp,
+					             tree.dead.alive.predict$espar) ,
+								 levels(factor(paste(tree.dead.alive.growth$idp,
+								          tree.dead.alive.growth$espar))) )]
+# param
+B1 <- GROWTH$BUGSoutput$summary[1:NSP,1]
+B2 <- GROWTH$BUGSoutput$summary[(NSP+1):(NSP*2),1]
+random.plot <- GROWTH$BUGSoutput$summary[(NSP*2+1):(NSP*2+Nsp.plots),1]
+pred.log.g <- B1[pred.species] + B2[pred.species]*pred.logdbh +random.plot[pred.species.plot]
+pred.g <- exp(pred.log.g)
+```
+
+Do same estimation with inla
+
+```{r inla estimation of ir5,  message=FALSE}
+
+# TRY WITH INLA
+data.all <-rbind(tree.dead.alive.growth, tree.dead.alive.predict)
+data.inla <- data.frame(log.ir5 = log(data.all$ir5),
+                        logdbh = log(data.all$c13/pi),
+			species =  factor(data.all$espar),
+			species.plot = as.vector(unclass(factor(paste(data.all$idp,
+                          data.all$espar)))),
+						species.plot2 = as.vector(unclass(factor(paste(data.all$idp,
+                                  data.all$espar))))
+								  )
+library(INLA)
+
+if(!file.exists(file.path(output.dir, "GROWTH.INLA.rds"))){
+
+formule_random <- log.ir5 ~ species +logdbh +logdbh:species +
+           f(species.plot,  model="iid", hyper=list(theta=list(prior="loggamma",param=c(0.1,0.1)))) +
+           f(species.plot2, logdbh, model="iid", hyper=list(theta=list(prior="loggamma",param=c(0.1,0.1))))
+model.r.INLA <- inla(formula=formule_random,
+                     data=data.inla, family="gaussian",
+                     control.compute=list(dic=TRUE,
+                                           config = TRUE),
+                     control.inla = list(strategy = "gaussian", int.strategy = "eb"),
+                     control.fixed = list( prec.intercept = 0.01),
+					 verbose = TRUE)
+summary(model.r.INLA)
+saveRDS(model.r.INLA,file=file.path(output.dir, "GROWTH.INLA.rds"))
+}else{
+model.r.INLA <- readRDS(file.path(output.dir, "GROWTH.INLA.rds"))
+}
+# prediction
+data.all$pred.ir5.inla <- exp(model.r.INLA$summary.fitted.values$mean )
+
+data.t <-data.all[data.all$tree.num %in% tree.dead.alive.predict$tree.num,]
+data.pred <- data.frame(tree.num = tree.dead.alive.predict$tree.num,
+                        pred.ir5.hb = pred.g)
+data.pred <- merge(data.pred, data.t[ , c('tree.num', 'pred.ir5.inla')], by = 'tree.num')
+
+
+```
+
+
+
+Another solution is also to affect to trees with missing ir5 the growth measurement of trees of the same species and same dbh class.
+
+```{r  prediction of ir5 based on mean of measurement,  message=FALSE}
+library(dplyr)
+data.all <- mutate(data.all,
+                   cut.c13 = cut(c13,
+                                 breaks=c(12,70.5,117.5,164.5,830),labels=F),
+                   id.plot.sp.cut = paste0(idp, espar, cut.c13))
+data.pred.m <- data.all %>% group_by(id.plot.sp.cut) %>%
+               summarise(pred.ir5.mean = mean(ir5, na.rm = TRUE))
+data.all <- left_join(data.all, data.pred.m, by = 'id.plot.sp.cut')
+data.all <-mutate(data.all,
+                  pred.ir5.m = ifelse(!is.na(ir5), ir5, pred.ir5.mean)) %>%
+                  select(-id.plot.sp.cut)
+data.pred.t <- data.frame(tree.num = data.all$tree.num,
+                        pred.ir5.mean = data.all$pred.ir5.m)
+data.pred <- left_join(data.pred, data.pred.t, by = 'tree.num')
+```
+
+Compare the two type of prediction. TODO COMPARE ALSO INLA
+
+```{r  Compare prediction,  message=FALSE}
+par(mfrow = c(1, 2))
+plot(data.pred$pred.ir5.hb, data.pred$pred.ir5.mean,xlab="prediction HB",ylab="prediction Mean ir5")
+lines(0:50,0:50,col="red")
+plot(data.pred$pred.ir5.hb, data.pred$pred.ir5.inla,xlab="prediction HB",ylab="prediction inla ir5")
+lines(0:50,0:50,col="red")
+
+par(mfrow=c(2,2))
+ data <- data.frame(tree.dead.alive.predict$c13,data.pred$pred.ir5.hb)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)
+ plot(tree.dead.alive.predict$c13,data.pred$pred.ir5.hb,xlab="c13",
+      ylab="prediction HB ir5",cex=0.2,xlim=c(0,600),
+	  ylim=c(0,80),col=colors)
+ data <- data.frame(tree.dead.alive.predict$c13,data.pred$pred.ir5.mean)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)
+plot(tree.dead.alive.predict$c13,data.pred$pred.ir5.mean,xlab="c13",
+     ylab="prediction Mean ir5",cex=0.2,xlim=c(0,600),ylim=c(0,80),col=colors)
+ data <- data.frame(tree.dead.alive.predict$c13,data.pred$pred.ir5.inla)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)
+plot(tree.dead.alive.predict$c13, data.pred$pred.ir5.inla,
+     xlab="c13",ylab="pred ir5 inla",cex=0.2,xlim=c(0,600),ylim=c(0,80),col=colors)
+ data <- data.frame(tree.dead.alive.growth$c13,tree.dead.alive.growth$ir5)
+ names(data) <- c("X","Y")
+ colors  <- densCols(data)
+plot(tree.dead.alive.growth$c13, tree.dead.alive.growth$ir5,xlab="c13",
+     ylab="prediction inla ir5",cex=0.2,xlim=c(0,600),ylim=c(0,80),col=colors)
+```
+
+
+Add these two variables to data base
+
+```{r add predicts,  message=FALSE}
+tree.tot <- left_join(tree.dead.alive, data.pred, by = 'tree.num')
+
+
+saveRDS(tree.tot,file=file.path(output.dir, "tree.tot3.rds"))
+```
+
+# Recruited tree  based on past growth
+
+```{r data for recruits,  message=FALSE}
+tree.tot3 <- readRDS(file.path(output.dir, "tree.tot3.rds"))
+### merge ir5 and pred.ir5.hb
+tree.tot3$ir5.hb <-  tree.tot3$ir5
+tree.tot3$ir5.hb[is.na(tree.tot3$ir5)] <-
+         tree.tot3$pred.ir5.hb[is.na(tree.tot3$ir5)]
+
+tree.tot3$ir5.m <-  tree.tot3$ir5
+tree.tot3$ir5.m[is.na(tree.tot3$ir5)] <-
+tree.tot3$pred.ir5.mean[is.na(tree.tot3$ir5)]
+
+tree.tot3$ir5.i <-  tree.tot3$ir5
+tree.tot3$ir5.i[is.na(tree.tot3$ir5)] <-
+tree.tot3$pred.ir5.inla[is.na(tree.tot3$ir5)]
+
+
+tree.tot3$recruit.hb <- rep_len(0, nrow(tree.tot3))
+tree.tot3$recruit.i <- rep_len(0, nrow(tree.tot3))
+tree.tot3$recruit.m <- rep_len(0, nrow(tree.tot3))
+
+tree.tot3$recruit.hb[(tree.tot3$c13 -2*pi*tree.tot3$ir5.hb) <23.5] <- 1
+tree.tot3$recruit.i[(tree.tot3$c13 -2*pi*tree.tot3$ir5.i) <23.5] <- 1
+tree.tot3$recruit.m[(tree.tot3$c13 -2*pi*tree.tot3$ir5.m) <23.5] <- 1
+
+
+##### save data
+saveRDS(tree.tot3,file=file.path(output.dir, "data.all.rds"))
+```
