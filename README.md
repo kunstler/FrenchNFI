@@ -1,14 +1,14 @@
-% Description of the French National Forest Inventory data
-% Georges Kunstler
+# Description of the French National Forest Inventory data
+# Georges Kunstler
 
 Irstea EMGR Grenoble France <georges.kunstler@gmail.com>
 
-# Introduction
+## Introduction
 
 This repo provides the R code to format the French National Forest Inventory. In this README I describes the data from the French National Forest Inventory (NFI). 
 
 
-# Data description
+## Data description
 
 The French National Forest Inventory comprises a network of temporary plots established on a grid of approximately 1000 x 1000 m. Ten percent of the cell is sampled each year (we used data from 2005 to 2011). If a particular grid node falls within a forested area, a plot is established (randomly located in a square of 450m around the center of the cell), the soil type is characterized and dendrometric data are measured. Measurements are taken in three concentric circular subplots of different radii, based on circumference at breast height ($C_{130}$). All trees with $C_{130}$  > 23.5 cm, > 70.5 cm and > 117.5 cm were measured within a radius of 6 m, 9 m and 15 m, respectively.  For each measured tree, stem circumference, species, status (dead or alive, including only tree that died less than five years ago according to bark and small branches state), and radial growth over five years were recorded.  The radial growth was determined from two short cores taken at breast height.  Soil properties were analysed using a soil pit of up to 1 m depth located in the center of the plot.  One or two soil horizons were distinguished from the soil pit, and depth, texture (based on eight classes) and coarse fragment content were recorded for each horizon.
 
@@ -19,13 +19,13 @@ The French National Forest Inventory comprises a network of temporary plots esta
 
 The following document give details about data formatting and the computation of the basal area at the two dates.
 
-## Data downloaded
+### Data downloaded
  The data were downloaded from
  [IGN website](http://inventaire-forestier.ign.fr) for each of
  following year of inventory: 2008 to 2013. For each year, four files are provided: individual alive trees data, individual dead trees data, ecological data. It was needed to merge data for each year and to homogenize the different variables because the variables and the category of the variables have changed between years (see at the end of the document). In addition we purchased form IGN the exact elevation of the plot (the exact coordinates of plots are not available only the center of the 1x1km cell where the plot is located).
 
 
-# Simplified tree
+## Simplified tree
 
 If the number of tree of given species and a given size class
 ($C_{130}$ classes 23.5-70.5, 70.5-117.5, 117.5-164.5, more than 164.5cm) is greater than 6, the radial growth is measured only on 6 individuals. To compute the basal area on the plot 5-years ago it is need to estimate the growth of the trees lacking growth measurement (simplified tree). We explored two methods to predict the growth of this individuals. 
@@ -35,31 +35,33 @@ If the number of tree of given species and a given size class
 
 We used the prediction of the mixed model because it allows for a continuous effect of tree size ($C_{130}$).
 
-# Recruitment
+## Recruitment
 
 A tree was considered as a recruit during the five years period if according to its five years radial growth rate it $C_{130}$ was less than 23.5cm five years ago ($C_{130} -G \times 2 < 23.5$).
 
 
-# Matching of different years
+## Matching of different years
 
 See R script READ.DATA.NFI.R
 
-## Alive tree
+### Alive tree
 
-(@) *simplif* and *sfcoeur* are missing in 2008.
+- *simplif* and *sfcoeur* are missing in 2008.
 
 
-## Plot data
+### Plot data
 
-(@) The variables $gest$ $incid$ $peupnr$ $asperite$ $tm2$ were
+- The variables $gest$ $incid$ $peupnr$ $asperite$ $tm2$ were
 missing in 2008.
 
-## Ecological data
+### Ecological data
 
 We only use the pedological variables. The was no changes in variables between years for the variables we used (soil description).
 
 
 
-# References
+## References
+
 - Kunstler, G., Albert, C.H., Courbaud, B., Lavergne, S., Thuiller, W., Vieilledent, G., Zimmermann, N.E., Coomes, D.A. (2011) Effects of competition on tree radial-growth vary in importance but not in intensity along climatic gradients. Journal of Ecology, **99**, 300–312.
+
 - Plummer, M. (2003) JAGS: A program for analysis of Bayesian graphical models using Gibbs sampling. In Proceedings of the 3rd International Workshop on Distributed Statistical Computing (DSC 2003). March, pp. 20–22.
