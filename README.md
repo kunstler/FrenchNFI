@@ -1,11 +1,11 @@
 % Description of the French National Forest Inventory data
 % Georges Kunstler
 
-## Department of Biological Sciences Macquarie University, Sydney, NSW / Irstea EMGR Grenoble France <georges.kunstler@gmail.com>
+Irstea EMGR Grenoble France <georges.kunstler@gmail.com>
 
 # Introduction
 
-This repo provides the R code to format the French National Forest Inventory. In this REAME I describes the data from the French National Forest Inventory (NFI). 
+This repo provides the R code to format the French National Forest Inventory. In this README I describes the data from the French National Forest Inventory (NFI). 
 
 
 # Data description

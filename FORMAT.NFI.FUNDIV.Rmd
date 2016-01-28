@@ -3,25 +3,27 @@
 
 
 ```{r read formatted tree data,  message=FALSE}
+output.dir <- 'output'
 tree.tot <- readRDS(file=file.path(output.dir, "data.all.rds"))
-load(file=file.path(output.dir, "plot.tot.Rdata"))
+load(file=file.path(output.dir, "data.plot.Rdata"))
 ```
 
 Merge tree and plot
 ```{r merge,  message=FALSE}
-data.tree.plot <-  merge(tree.tot,plot.tot,by="idp")
+data.tree.plot <-  merge(tree.tot,data.plot,by="idp")
 ```
 Load ecology data for date
 ```{r load ecology file,  message=FALSE}
-load(file=file.path(output.dir, "ecology.tot.Rdata"))
+load(file=file.path(output.dir, "data.ecol.Rdata"))
 ```
 Merge with ecology for the date and select variables
 ```{r merge ecology,  message=FALSE}
 data.tree.plot <-  merge(data.tree.plot, 
-                         ecology.tot[, c('idp', 'dateeco')],
+                         data.ecol[, c('idp', 'dateeco')],
                          by= "idp")
 
-vars <-c('idp', 'dateeco', 'dep', 'uta1', 'uta2', 'dc', 'tplant',
+vars <-c('idp', 'xl93', 'yl93', 'dateeco', 'dep', 'uta1', 'uta2',
+         'dc', 'tplant',
          'gest', 'incid', 'plisi', 'espar', 'dead', 'datemort',
          'veget', 'c13', 'htot', 'w', 'acci', 'ir5', 'ir5.hb', 'ir5.m')
 data.fundiv <- data.tree.plot[, vars]
@@ -100,7 +102,7 @@ $c13$ circumference at breast height in cm
 - **Height**
 $htot$ measured for a sample of dominant trees on each plot in m.
 - **Sample radius**
-$w$ is a weighting variable based on the size of the subplot, potential edge effect, and simplified tree (tree of the same species and same dbh class are not measured but include in this weight before 2009 - tree are simplified when there is more than 20 trees of the same species and same size class).
+$w$ is a weighting variable (per hectare) based on the size of the subplot, potential edge effect, and simplified tree (tree of the same species and same dbh class are not measured but include in this weight before 2009 - tree are simplified when there is more than 20 trees of the same species and same size class).
 - **Damage** to the tree (yes/no)
   $acci$ only important damage are recorded.
   acci = 0 no damage
