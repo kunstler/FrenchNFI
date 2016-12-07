@@ -1,4 +1,4 @@
-% Script to format French NFI in the format required by Sophia
+% Script to format French NFI in the format required for FUNDIV project
 % Georges Kunstler
 
 
@@ -21,17 +21,15 @@ Merge with ecology for the date and select variables
 data.tree.plot <-  merge(data.tree.plot, 
                          data.ecol[, c('idp', 'dateeco')],
                          by= "idp")
-
 vars <-c('idp', 'xl93', 'yl93', 'dateeco', 'dep', 'uta1', 'uta2',
          'dc', 'tplant',
          'gest', 'incid', 'plisi', 'espar', 'dead', 'datemort',
          'veget', 'c13', 'htot', 'w', 'acci', 'ir5', 'ir5.hb', 'ir5.m')
 data.fundiv <- data.tree.plot[, vars]
 saveRDS(data.fundiv,file=file.path(output.dir, "data.fundiv.rds"))
-
 ```
 
-# List of variables requested by sophia
+# List of variables requested for FUNDIV
 
 ## Plot level
 - **Plot code** => idp
@@ -46,7 +44,7 @@ UTA1 and UTA2 provides information type of use (two main use possible so UTA1 an
 UTA = 4 strict protection (no access)
 UTA = 5 other kind of natural reserve
 - **Ownership** (public/private) **\color{red} Not available**
-- **Altitude** **\color{red} The exact elevation is not available in the public data, you can use the elevation based on cell coordinates. I purchased the exact elevation for the plot, but this can not be redistributed directly.**
+- **Altitude** **\color{red} The exact elevation is not available in the public data, you can use the elevation based on cell coordinates. 
 - **Management history**
 Several variables provide information:
   dc is harvesting recent history

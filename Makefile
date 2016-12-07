@@ -1,8 +1,4 @@
-all: README.pdf READ.FRENCH.NFI.pdf RECRUIT.FORMAT.pdf FORMAT.NFI.FUNDIV.pdf
-
-
-README.pdf: README.md include.tex
-	pandoc $<   --template=include.tex --variable mainfont="Times New Roman" --variable sansfont=Arial --variable fontsize=12pt --latex-engine=xelatex -o $@
+all: READ.FRENCH.NFI.pdf RECRUIT.FORMAT.pdf FORMAT.NFI.FUNDIV.pdf
 
 READ.FRENCH.NFI.md: READ.FRENCH.NFI.Rmd
 	Rscript  -e "library(knitr);  knit('READ.FRENCH.NFI.Rmd', output = 'READ.FRENCH.NFI.md')"	

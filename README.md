@@ -5,12 +5,21 @@ Irstea EMGR Grenoble France <georges.kunstler@gmail.com>
 
 ## Introduction
 
-This repo provides the R code to format the French National Forest Inventory. In this README I describes the data from the French National Forest Inventory (NFI). 
+This repository provides R codes to format the French National Forest Inventory. In this README I describes the data from the French National Forest Inventory (NFI). At the moment the code is quite messy and mainly provided in .Rmd file where R code is mixed with explainaition. I need to split that in functions and tex.
 
+### Data downloaded
+ The data were downloaded from
+ [IGN website](http://inventaire-forestier.ign.fr/spip/spip.php?rubrique153) for each of
+ following year of inventory: 2008 to 2013. For each year, four files are provided: individual alive trees data, individual dead trees data, ecological data. To merge data for each year, it is need to homogenize the different variables because the variables and the category of the variables have changed between years (see at the end of the document). 
 
 ## Data description
 
-The French National Forest Inventory comprises a network of temporary plots established on a grid of approximately 1000 x 1000 m. Ten percent of the cell is sampled each year (we used data from 2005 to 2011). If a particular grid node falls within a forested area, a plot is established (randomly located in a square of 450m around the center of the cell), the soil type is characterized and dendrometric data are measured. Measurements are taken in three concentric circular subplots of different radii, based on circumference at breast height ($C_{130}$). All trees with $C_{130}$  > 23.5 cm, > 70.5 cm and > 117.5 cm were measured within a radius of 6 m, 9 m and 15 m, respectively.  For each measured tree, stem circumference, species, status (dead or alive, including only tree that died less than five years ago according to bark and small branches state), and radial growth over five years were recorded.  The radial growth was determined from two short cores taken at breast height.  Soil properties were analysed using a soil pit of up to 1 m depth located in the center of the plot.  One or two soil horizons were distinguished from the soil pit, and depth, texture (based on eight classes) and coarse fragment content were recorded for each horizon.
+A detail description of the French NFI is provided by [Vidal et al. (2005)](http://www.nrs.fs.fed.us/pubs/gtr/gtr_wo077/gtr_wo077_067.pdf).
+
+Here is a short description.
+The French National Forest Inventory comprises a network of temporary plots established on a grid of approximately 1000 x 1000 m. Ten percent of the cell is sampled each year. If a particular grid node falls within a forested area, a plot is established (randomly located in a square of 450m around the center of the cell), the soil type is characterized and dendrometric data are measured. Measurements are taken in three concentric circular subplots of different radii, based on circumference at breast height ($C_{130}$). All trees with $C_{130}$  > 23.5 cm, > 70.5 cm and > 117.5 cm are measured within a radius of 6 m, 9 m and 15 m, respectively.  For each measured tree, stem circumference, species, status (dead or alive, including only tree that died less than five years ago according to bark and small branches state), and radial growth over five years were recorded.  The radial growth are determined from two short cores taken at breast height.  Soil properties are analysed using a soil pit of up to 1 m depth located in the center of the plot.  One or two soil horizons are distinguished from the soil pit, and depth, texture (based on eight classes) and coarse fragment content were recorded for each horizon.
+
+## Processed data
 
 * The basal area per species at the time of measurement was computed based on the circumference of each alive tree and their respective weight according to size of the subplot. We then computed the basal area five years before using the following information to reconstruct the stand:
     + the five years radial growth of alive tree,
@@ -18,11 +27,6 @@ The French National Forest Inventory comprises a network of temporary plots esta
 	+ the trees that recruited during this period (their $C_{130}$ were below the minimum circumference five years ago according to their growth).
 
 The following document give details about data formatting and the computation of the basal area at the two dates.
-
-### Data downloaded
- The data were downloaded from
- [IGN website](http://inventaire-forestier.ign.fr/spip/spip.php?rubrique153) for each of
- following year of inventory: 2008 to 2013. For each year, four files are provided: individual alive trees data, individual dead trees data, ecological data. It was needed to merge data for each year and to homogenize the different variables because the variables and the category of the variables have changed between years (see at the end of the document). In addition we purchased form IGN the exact elevation of the plot (the exact coordinates of plots are not available only the center of the 1x1km cell where the plot is located).
 
 
 ## Simplified tree
