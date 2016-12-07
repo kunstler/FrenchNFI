@@ -21,7 +21,7 @@ The following document give details about data formatting and the computation of
 
 ### Data downloaded
  The data were downloaded from
- [IGN website](http://inventaire-forestier.ign.fr) for each of
+ [IGN website](http://inventaire-forestier.ign.fr/spip/spip.php?rubrique153) for each of
  following year of inventory: 2008 to 2013. For each year, four files are provided: individual alive trees data, individual dead trees data, ecological data. It was needed to merge data for each year and to homogenize the different variables because the variables and the category of the variables have changed between years (see at the end of the document). In addition we purchased form IGN the exact elevation of the plot (the exact coordinates of plots are not available only the center of the 1x1km cell where the plot is located).
 
 
