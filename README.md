@@ -5,7 +5,7 @@ Irstea EMGR Grenoble France <georges.kunstler@gmail.com>
 
 ## Introduction
 
-This repository provides R codes to format the French National Forest Inventory. In this README I describes the data from the French National Forest Inventory (NFI). At the moment the code is quite messy and mainly provided in .Rmd file where R code is mixed with explainaition. I need to split that in functions and tex.
+This repository provides R codes to format the French National Forest Inventory. In this README I describes the data from the French National Forest Inventory (NFI). At the moment the code is quite messy and mainly provided in .Rmd file where R code is mixed with explanation. I need to split that in functions and text.
 
 ### Data downloaded
  The data were downloaded from
