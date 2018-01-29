@@ -25,6 +25,12 @@ data.tree <- read_tree()
 save(data.tree,file=file.path(output.dir, "data.tree.Rdata"))
 ```
 
+# READ, MERGE AND CLEAN ALL SPECIES COVER DATA NEW METHODS
+Read the data for each year, homogenize and save.
+```{r Read tree data,  message=FALSE}
+data.couv <- read_couv()
+save(data.couv,file=file.path(output.dir, "data.couv.Rdata"))
+```
 
 # READ, MERGE AND CLEAN ALL DEAD TREE DATA NEW METHODS
 Read the dead tree data for each year, homogenize and save.

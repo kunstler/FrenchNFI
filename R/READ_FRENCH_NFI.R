@@ -20,6 +20,24 @@ read_tree <- function(path = "data"){
 }
 
 
+
+read_couv <- function(path = "data"){
+  list.couv <- lapply(2008:2013,
+        function(y) read.csv(file.path(path, y,
+                                       paste0("couverts_foret_", y, ".csv")),
+                              sep=";"))
+  # add year to each data
+  list.couv <- lapply(1:6,
+           function(i, list.t, years){
+                 list.t[[i]]$year <- years[i];
+                 return(list.t[[i]])
+           },
+           list.couv, 2008:2013)
+  data.couv <- do.call("rbind", list.couv)
+  return(data.couv)
+}
+
+
 read_dead_tree <-  function(path = "data"){
   list.tree.dead <- lapply(2008:2013,
     function(y) read.csv(file.path(path, y,
